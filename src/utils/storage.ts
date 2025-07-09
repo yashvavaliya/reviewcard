@@ -195,13 +195,9 @@ export const storage = {
           .from('review_cards')
           .select('*')
           .eq('slug', slug)
-          .single();
+          .maybeSingle();
 
         if (error) {
-          // Handle the specific case where no rows are found
-          if (error.code === 'PGRST116') {
-            return null;
-          }
           console.error('Error fetching card by slug from Supabase:', error);
           return this._getLocalCardBySlug(slug);
         }
