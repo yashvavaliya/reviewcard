@@ -46,8 +46,39 @@ function App() {
 
 // Component to handle dynamic review card routing
 const DynamicReviewCard: React.FC = () => {
+  const [card, setCard] = React.useState(null);
+  const [loading, setLoading] = React.useState(true);
   const slug = window.location.pathname.slice(1); // Remove leading slash
-  const card = storage.getCardBySlug(slug);
+
+  React.useEffect(() => {
+    const loadCard = async () => {
+      try {
+        const foundCard = await storage.getCardBySlug(slug);
+        setCard(foundCard);
+      } catch (error) {
+        console.error('Error loading card:', error);
+        setCard(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadCard();
+  }, [slug]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 bg-blue-500/20 rounded-full flex items-center justify-center mx-auto mb-6">
+            <div className="w-8 h-8 border-2 border-blue-400 border-t-transparent rounded-full animate-spin"></div>
+          </div>
+          <h1 className="text-2xl font-bold text-white mb-4">Loading Review Card</h1>
+          <p className="text-slate-400">Please wait...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!card) {
     return (

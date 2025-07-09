@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit, Trash2, Eye, Search, Building2, Calendar, LogOut } from 'lucide-react';
+import { Plus, Edit, Trash2, Eye, Search, Building2, Calendar, LogOut, Database, Loader2 } from 'lucide-react';
 import { ReviewCard } from '../types';
 import { storage } from '../utils/storage';
 import { formatDate } from '../utils/helpers';
@@ -15,33 +15,69 @@ export const AdminDashboard: React.FC = () => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingCard, setEditingCard] = useState<ReviewCard | null>(null);
   const [deletingCard, setDeletingCard] = useState<ReviewCard | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isMigrating, setIsMigrating] = useState(false);
 
   useEffect(() => {
     loadCards();
+    checkForMigration();
   }, []);
 
-  const loadCards = () => {
-    const savedCards = storage.getCards();
-    setCards(savedCards);
+  const loadCards = async () => {
+    setIsLoading(true);
+    try {
+      const savedCards = await storage.getCards();
+      setCards(savedCards);
+    } catch (error) {
+      console.error('Error loading cards:', error);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleAddCard = (newCard: ReviewCard) => {
-    storage.addCard(newCard);
-    loadCards();
-    setShowAddModal(false);
+  const checkForMigration = async () => {
+    const localData = localStorage.getItem('scc_review_cards');
+    if (localData) {
+      const localCards = JSON.parse(localData);
+      if (localCards.length > 0) {
+        setIsMigrating(true);
+        await storage.migrateFromLocalStorage();
+        setIsMigrating(false);
+        // Reload cards after migration
+        loadCards();
+      }
+    }
   };
 
-  const handleEditCard = (updatedCard: ReviewCard) => {
-    storage.updateCard(updatedCard);
-    loadCards();
-    setEditingCard(null);
-  };
-
-  const handleDeleteCard = () => {
-    if (deletingCard) {
-      storage.deleteCard(deletingCard.id);
+  const handleAddCard = async (newCard: ReviewCard) => {
+    const success = await storage.addCard(newCard);
+    if (success) {
       loadCards();
-      setDeletingCard(null);
+      setShowAddModal(false);
+    } else {
+      alert('Failed to add card. Please try again.');
+    }
+  };
+
+  const handleEditCard = async (updatedCard: ReviewCard) => {
+    const success = await storage.updateCard(updatedCard);
+    if (success) {
+      loadCards();
+      setEditingCard(null);
+    } else {
+      alert('Failed to update card. Please try again.');
+    }
+  };
+
+  const handleDeleteCard = async () => {
+    if (deletingCard) {
+      const success = await storage.deleteCard(deletingCard.id);
+      if (success) {
+        loadCards();
+        setDeletingCard(null);
+      } else {
+        alert('Failed to delete card. Please try again.');
+      }
     }
   };
 
@@ -59,6 +95,26 @@ export const AdminDashboard: React.FC = () => {
     window.location.href = '/login';
   };
 
+  if (isMigrating) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 bg-blue-500/20 rounded-full flex items-center justify-center mx-auto mb-6">
+            <Database className="w-8 h-8 text-blue-400 animate-pulse" />
+          </div>
+          <h1 className="text-2xl font-bold text-white mb-4">Migrating Data</h1>
+          <p className="text-slate-400 mb-8">
+            Moving your review cards to cloud storage for cross-device sync...
+          </p>
+          <div className="flex items-center justify-center">
+            <Loader2 className="w-6 h-6 text-blue-400 animate-spin mr-2" />
+            <span className="text-blue-400">Please wait...</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
       {/* Background Effects */}
@@ -71,7 +127,11 @@ export const AdminDashboard: React.FC = () => {
       <div className="relative z-10 container mx-auto px-4 py-8">
         {/* Header */}
         <div className="text-center mb-12">
-          <div className="flex justify-end mb-4">
+          <div className="flex justify-between items-center mb-4">
+            <div className="flex items-center text-green-400 text-sm">
+              <Database className="w-4 h-4 mr-2" />
+              <span>Cloud Storage Active</span>
+            </div>
             <button
               onClick={handleLogout}
               className="inline-flex items-center px-4 py-2 bg-red-600/20 text-red-400 rounded-lg hover:bg-red-600/30 transition-colors duration-200"
@@ -83,6 +143,9 @@ export const AdminDashboard: React.FC = () => {
           <h1 className="text-4xl lg:text-5xl font-bold text-white mb-4 bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
             Review Cards Dashboard
           </h1>
+          <p className="text-slate-300">
+            Your review cards are now synced across all devices
+          </p>
         </div>
 
         {/* Controls */}
@@ -147,8 +210,16 @@ export const AdminDashboard: React.FC = () => {
           </div>
         </div>
 
-        {/* Cards Grid */}
-        {filteredCards.length === 0 ? (
+        {/* Loading State */}
+        {isLoading ? (
+          <div className="text-center py-16">
+            <div className="w-16 h-16 bg-blue-500/20 rounded-full flex items-center justify-center mx-auto mb-6">
+              <Loader2 className="w-8 h-8 text-blue-400 animate-spin" />
+            </div>
+            <h3 className="text-2xl font-semibold text-white mb-2">Loading Cards</h3>
+            <p className="text-slate-400">Fetching your review cards from cloud storage...</p>
+          </div>
+        ) : filteredCards.length === 0 ? (
           <div className="text-center py-16">
             <div className="w-24 h-24 bg-slate-700/50 rounded-full flex items-center justify-center mx-auto mb-6">
               <Building2 className="w-12 h-12 text-slate-400" />
