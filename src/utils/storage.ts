@@ -3,6 +3,12 @@ import { supabase, isSupabaseConfigured } from './supabase';
 
 const STORAGE_KEY = 'scc_review_cards';
 
+// Helper function to validate UUID format
+const isValidUuid = (id: string): boolean => {
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(id);
+};
+
 // Transform database row to ReviewCard type
 const transformDbRowToCard = (row: any): ReviewCard => ({
   id: row.id,
@@ -19,19 +25,27 @@ const transformDbRowToCard = (row: any): ReviewCard => ({
 });
 
 // Transform ReviewCard to database insert format
-const transformCardToDbInsert = (card: ReviewCard) => ({
-  id: card.id,
-  business_name: card.businessName,
-  category: card.category,
-  type: card.type,
-  description: card.description || null,
-  location: card.location || null,
-  slug: card.slug,
-  logo_url: card.logoUrl || null,
-  google_maps_url: card.googleMapsUrl
-});
+const transformCardToDbInsert = (card: ReviewCard) => {
+  const baseData = {
+    business_name: card.businessName,
+    category: card.category,
+    type: card.type,
+    description: card.description || null,
+    location: card.location || null,
+    slug: card.slug,
+    logo_url: card.logoUrl || null,
+    google_maps_url: card.googleMapsUrl
+  };
 
-// Transform ReviewCard to database update format
+  // Only include id if it's a valid UUID, otherwise let Supabase generate one
+  if (isValidUuid(card.id)) {
+    return { id: card.id, ...baseData };
+  }
+  
+  return baseData;
+};
+
+// Transform ReviewCard to database update format (keeping original structure)
 const transformCardToDbUpdate = (card: ReviewCard) => ({
   business_name: card.businessName,
   category: card.category,
