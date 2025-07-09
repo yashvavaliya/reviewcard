@@ -34,7 +34,9 @@ const transformCardToDbInsert = (card: ReviewCard) => {
     location: card.location || null,
     slug: card.slug,
     logo_url: card.logoUrl || null,
-    google_maps_url: card.googleMapsUrl
+    google_maps_url: card.googleMapsUrl,
+    created_at: card.createdAt || new Date().toISOString(),
+    updated_at: card.updatedAt || new Date().toISOString()
   };
 
   // Only include id if it's a valid UUID, otherwise let Supabase generate one
@@ -45,7 +47,7 @@ const transformCardToDbInsert = (card: ReviewCard) => {
   return baseData;
 };
 
-// Transform ReviewCard to database update format (keeping original structure)
+// Transform ReviewCard to database update format
 const transformCardToDbUpdate = (card: ReviewCard) => ({
   business_name: card.businessName,
   category: card.category,
@@ -106,20 +108,31 @@ export const storage = {
 
   async getCards(): Promise<ReviewCard[]> {
     try {
-      // Use Supabase if configured, otherwise fall back to localStorage
+      // Always try Supabase first if configured
       if (isSupabaseConfigured() && supabase) {
-        const { data, error } = await supabase
-          .from('review_cards')
-          .select('*')
-          .order('created_at', { ascending: false });
+        try {
+          const { data, error } = await supabase
+            .from('review_cards')
+            .select('*')
+            .order('created_at', { ascending: false });
 
-        if (error) {
-          console.error('Error fetching cards from Supabase:', error);
+          if (error) {
+            console.error('Supabase error, falling back to localStorage:', error);
+            return this._getLocalCards();
+          }
+
+          const supabaseCards = (data || []).map(transformDbRowToCard);
+          
+          // Also sync with localStorage for offline access
+          this._saveLocalCards(supabaseCards);
+          
+          return supabaseCards;
+        } catch (supabaseError) {
+          console.error('Supabase connection failed, using localStorage:', supabaseError);
           return this._getLocalCards();
         }
-
-        return (data || []).map(transformDbRowToCard);
       } else {
+        console.log('Supabase not configured, using localStorage');
         return this._getLocalCards();
       }
     } catch (error) {
@@ -130,94 +143,139 @@ export const storage = {
 
   async addCard(card: ReviewCard): Promise<boolean> {
     try {
-      if (isSupabaseConfigured() && supabase) {
-        const { error } = await supabase
-          .from('review_cards')
-          .insert([transformCardToDbInsert(card)]);
+      // Always save to localStorage first for immediate feedback
+      this._addLocalCard(card);
 
-        if (error) {
-          console.error('Error adding card to Supabase:', error);
-          this._addLocalCard(card);
-          return false;
+      // Then try to sync with Supabase if configured
+      if (isSupabaseConfigured() && supabase) {
+        try {
+          const { error } = await supabase
+            .from('review_cards')
+            .insert([transformCardToDbInsert(card)]);
+
+          if (error) {
+            console.error('Error adding card to Supabase (keeping in localStorage):', error);
+            // Card is already in localStorage, so return true
+            return true;
+          }
+          
+          console.log('Card successfully added to Supabase and localStorage');
+          return true;
+        } catch (supabaseError) {
+          console.error('Supabase connection failed (keeping in localStorage):', supabaseError);
+          // Card is already in localStorage, so return true
+          return true;
         }
-        return true;
       } else {
-        this._addLocalCard(card);
+        console.log('Supabase not configured, card saved to localStorage only');
         return true;
       }
     } catch (error) {
       console.error('Error adding card:', error);
-      this._addLocalCard(card);
       return false;
     }
   },
 
   async updateCard(updatedCard: ReviewCard): Promise<boolean> {
     try {
-      if (isSupabaseConfigured() && supabase) {
-        const { error } = await supabase
-          .from('review_cards')
-          .update(transformCardToDbUpdate(updatedCard))
-          .eq('id', updatedCard.id);
+      // Always update localStorage first
+      this._updateLocalCard(updatedCard);
 
-        if (error) {
-          console.error('Error updating card in Supabase:', error);
-          this._updateLocalCard(updatedCard);
-          return false;
+      // Then try to sync with Supabase if configured
+      if (isSupabaseConfigured() && supabase) {
+        try {
+          const { error } = await supabase
+            .from('review_cards')
+            .update(transformCardToDbUpdate(updatedCard))
+            .eq('id', updatedCard.id);
+
+          if (error) {
+            console.error('Error updating card in Supabase (keeping localStorage changes):', error);
+            // Card is already updated in localStorage
+            return true;
+          }
+          
+          console.log('Card successfully updated in Supabase and localStorage');
+          return true;
+        } catch (supabaseError) {
+          console.error('Supabase connection failed (keeping localStorage changes):', supabaseError);
+          // Card is already updated in localStorage
+          return true;
         }
-        return true;
       } else {
-        this._updateLocalCard(updatedCard);
+        console.log('Supabase not configured, card updated in localStorage only');
         return true;
       }
     } catch (error) {
       console.error('Error updating card:', error);
-      this._updateLocalCard(updatedCard);
       return false;
     }
   },
 
   async deleteCard(cardId: string): Promise<boolean> {
     try {
-      if (isSupabaseConfigured() && supabase) {
-        const { error } = await supabase
-          .from('review_cards')
-          .delete()
-          .eq('id', cardId);
+      // Always delete from localStorage first
+      this._deleteLocalCard(cardId);
 
-        if (error) {
-          console.error('Error deleting card from Supabase:', error);
-          this._deleteLocalCard(cardId);
-          return false;
+      // Then try to sync with Supabase if configured
+      if (isSupabaseConfigured() && supabase) {
+        try {
+          const { error } = await supabase
+            .from('review_cards')
+            .delete()
+            .eq('id', cardId);
+
+          if (error) {
+            console.error('Error deleting card from Supabase (keeping localStorage changes):', error);
+            // Card is already deleted from localStorage
+            return true;
+          }
+          
+          console.log('Card successfully deleted from Supabase and localStorage');
+          return true;
+        } catch (supabaseError) {
+          console.error('Supabase connection failed (keeping localStorage changes):', supabaseError);
+          // Card is already deleted from localStorage
+          return true;
         }
-        return true;
       } else {
-        this._deleteLocalCard(cardId);
+        console.log('Supabase not configured, card deleted from localStorage only');
         return true;
       }
     } catch (error) {
       console.error('Error deleting card:', error);
-      this._deleteLocalCard(cardId);
       return false;
     }
   },
 
   async getCardBySlug(slug: string): Promise<ReviewCard | null> {
     try {
+      // Try Supabase first if configured
       if (isSupabaseConfigured() && supabase) {
-        const { data, error } = await supabase
-          .from('review_cards')
-          .select('*')
-          .eq('slug', slug)
-          .maybeSingle();
+        try {
+          const { data, error } = await supabase
+            .from('review_cards')
+            .select('*')
+            .eq('slug', slug)
+            .maybeSingle();
 
-        if (error) {
-          console.error('Error fetching card by slug from Supabase:', error);
+          if (error) {
+            console.error('Supabase error, falling back to localStorage:', error);
+            return this._getLocalCardBySlug(slug);
+          }
+
+          if (data) {
+            return transformDbRowToCard(data);
+          }
+          
+          // If not found in Supabase, check localStorage
+          return this._getLocalCardBySlug(slug);
+        } catch (supabaseError) {
+          console.error('Supabase connection failed, using localStorage:', supabaseError);
           return this._getLocalCardBySlug(slug);
         }
-
-        return data ? transformDbRowToCard(data) : null;
       } else {
+        console.log('Supabase not configured, using localStorage');
         return this._getLocalCardBySlug(slug);
       }
     } catch (error) {
@@ -235,24 +293,90 @@ export const storage = {
 
     try {
       const localCards = this._getLocalCards();
-      if (localCards.length === 0) return;
+      if (localCards.length === 0) {
+        console.log('No local cards to migrate');
+        return;
+      }
 
-      console.log(`Migrating ${localCards.length} cards from localStorage to Supabase...`);
+      console.log(`Starting migration of ${localCards.length} cards from localStorage to Supabase...`);
+
+      let successCount = 0;
+      let failCount = 0;
 
       for (const card of localCards) {
-        const success = await this.addCard(card);
-        if (success) {
-          console.log(`Migrated card: ${card.businessName}`);
-        } else {
-          console.error(`Failed to migrate card: ${card.businessName}`);
+        try {
+          // Check if card already exists in Supabase
+          const { data: existingCard } = await supabase
+            .from('review_cards')
+            .select('id')
+            .eq('slug', card.slug)
+            .maybeSingle();
+
+          if (existingCard) {
+            console.log(`Card already exists in Supabase: ${card.businessName}`);
+            successCount++;
+            continue;
+          }
+
+          // Insert the card
+          const { error } = await supabase
+            .from('review_cards')
+            .insert([transformCardToDbInsert(card)]);
+
+          if (error) {
+            console.error(`Failed to migrate card: ${card.businessName}`, error);
+            failCount++;
+          } else {
+            console.log(`Successfully migrated card: ${card.businessName}`);
+            successCount++;
+          }
+        } catch (cardError) {
+          console.error(`Error migrating card: ${card.businessName}`, cardError);
+          failCount++;
         }
       }
 
-      // Clear localStorage after successful migration
-      localStorage.removeItem(STORAGE_KEY);
-      console.log('Migration completed and localStorage cleared.');
+      console.log(`Migration completed: ${successCount} successful, ${failCount} failed`);
+
+      // Only clear localStorage if all cards were successfully migrated
+      if (failCount === 0) {
+        localStorage.removeItem(STORAGE_KEY);
+        console.log('Migration successful - localStorage cleared');
+      } else {
+        console.log('Some cards failed to migrate - keeping localStorage as backup');
+      }
     } catch (error) {
       console.error('Error during migration:', error);
+    }
+  },
+
+  // Sync method to ensure data consistency
+  async syncData(): Promise<void> {
+    try {
+      if (!isSupabaseConfigured() || !supabase) {
+        console.log('Supabase not configured, sync skipped');
+        return;
+      }
+
+      const localCards = this._getLocalCards();
+      const { data: supabaseCards, error } = await supabase
+        .from('review_cards')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error syncing data:', error);
+        return;
+      }
+
+      const transformedSupabaseCards = (supabaseCards || []).map(transformDbRowToCard);
+      
+      // Update localStorage with latest Supabase data
+      this._saveLocalCards(transformedSupabaseCards);
+      
+      console.log('Data sync completed successfully');
+    } catch (error) {
+      console.error('Error during data sync:', error);
     }
   }
 };

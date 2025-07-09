@@ -5,11 +5,53 @@ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 
 // Only create client if environment variables are available
 export const supabase = supabaseUrl && supabaseAnonKey 
-  ? createClient(supabaseUrl, supabaseAnonKey)
+  ? createClient(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        persistSession: false // Disable auth since we're using local auth
+      }
+    })
   : null;
 
 export const isSupabaseConfigured = () => {
-  return !!(supabaseUrl && supabaseAnonKey && supabaseUrl !== 'your_supabase_project_url_here');
+  const isConfigured = !!(
+    supabaseUrl && 
+    supabaseAnonKey && 
+    supabaseUrl !== 'your_supabase_project_url_here' &&
+    supabaseUrl.includes('supabase.co')
+  );
+  
+  if (isConfigured) {
+    console.log('Supabase is properly configured');
+  } else {
+    console.log('Supabase not configured - using localStorage only');
+  }
+  
+  return isConfigured;
+};
+
+// Test connection function
+export const testSupabaseConnection = async (): Promise<boolean> => {
+  if (!isSupabaseConfigured() || !supabase) {
+    return false;
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('review_cards')
+      .select('count')
+      .limit(1);
+    
+    if (error) {
+      console.error('Supabase connection test failed:', error);
+      return false;
+    }
+    
+    console.log('Supabase connection test successful');
+    return true;
+  } catch (error) {
+    console.error('Supabase connection test error:', error);
+    return false;
+  }
 };
 
 // Database types

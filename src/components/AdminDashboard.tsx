@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit, Trash2, Eye, Search, Building2, Calendar, LogOut, Database, Loader2 } from 'lucide-react';
+import { Plus, Edit, Trash2, Eye, Search, Building2, Calendar, LogOut, Database, Loader2, Wifi, WifiOff, RefreshCw } from 'lucide-react';
 import { ReviewCard } from '../types';
 import { storage } from '../utils/storage';
 import { formatDate } from '../utils/helpers';
@@ -8,6 +8,7 @@ import { EditCardModal } from './EditCardModal';
 import { ConfirmDialog } from './ConfirmDialog';
 import { QRCodeCard } from './QRCodeCard';
 import { auth } from '../utils/auth';
+import { isSupabaseConfigured } from '../utils/supabase';
 
 export const AdminDashboard: React.FC = () => {
   const [cards, setCards] = useState<ReviewCard[]>([]);
@@ -17,67 +18,120 @@ export const AdminDashboard: React.FC = () => {
   const [deletingCard, setDeletingCard] = useState<ReviewCard | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isMigrating, setIsMigrating] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [connectionStatus, setConnectionStatus] = useState<'connected' | 'local' | 'checking'>('checking');
 
   useEffect(() => {
-    loadCards();
-    checkForMigration();
+    initializeDashboard();
   }, []);
 
-  const loadCards = async () => {
+  const initializeDashboard = async () => {
     setIsLoading(true);
+    
+    // Check connection status
+    if (isSupabaseConfigured()) {
+      setConnectionStatus('connected');
+      await checkForMigration();
+    } else {
+      setConnectionStatus('local');
+    }
+    
+    await loadCards();
+    setIsLoading(false);
+  };
+
+  const loadCards = async () => {
     try {
       const savedCards = await storage.getCards();
       setCards(savedCards);
+      console.log(`Loaded ${savedCards.length} cards`);
     } catch (error) {
       console.error('Error loading cards:', error);
-    } finally {
-      setIsLoading(false);
+      setCards([]);
     }
   };
 
   const checkForMigration = async () => {
     const localData = localStorage.getItem('scc_review_cards');
     if (localData) {
-      const localCards = JSON.parse(localData);
-      if (localCards.length > 0) {
-        setIsMigrating(true);
-        await storage.migrateFromLocalStorage();
+      try {
+        const localCards = JSON.parse(localData);
+        if (localCards.length > 0) {
+          console.log(`Found ${localCards.length} local cards to migrate`);
+          setIsMigrating(true);
+          await storage.migrateFromLocalStorage();
+          setIsMigrating(false);
+          console.log('Migration completed');
+        }
+      } catch (error) {
+        console.error('Error during migration check:', error);
         setIsMigrating(false);
-        // Reload cards after migration
-        loadCards();
       }
     }
   };
 
   const handleAddCard = async (newCard: ReviewCard) => {
-    const success = await storage.addCard(newCard);
-    if (success) {
-      loadCards();
-      setShowAddModal(false);
-    } else {
+    try {
+      const success = await storage.addCard(newCard);
+      if (success) {
+        await loadCards(); // Reload to get latest data
+        setShowAddModal(false);
+        console.log('Card added successfully:', newCard.businessName);
+      } else {
+        alert('Failed to add card. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error adding card:', error);
       alert('Failed to add card. Please try again.');
     }
   };
 
   const handleEditCard = async (updatedCard: ReviewCard) => {
-    const success = await storage.updateCard(updatedCard);
-    if (success) {
-      loadCards();
-      setEditingCard(null);
-    } else {
+    try {
+      const success = await storage.updateCard(updatedCard);
+      if (success) {
+        await loadCards(); // Reload to get latest data
+        setEditingCard(null);
+        console.log('Card updated successfully:', updatedCard.businessName);
+      } else {
+        alert('Failed to update card. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error updating card:', error);
       alert('Failed to update card. Please try again.');
     }
   };
 
   const handleDeleteCard = async () => {
     if (deletingCard) {
-      const success = await storage.deleteCard(deletingCard.id);
-      if (success) {
-        loadCards();
-        setDeletingCard(null);
-      } else {
+      try {
+        const success = await storage.deleteCard(deletingCard.id);
+        if (success) {
+          await loadCards(); // Reload to get latest data
+          setDeletingCard(null);
+          console.log('Card deleted successfully:', deletingCard.businessName);
+        } else {
+          alert('Failed to delete card. Please try again.');
+        }
+      } catch (error) {
+        console.error('Error deleting card:', error);
         alert('Failed to delete card. Please try again.');
       }
+    }
+  };
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      if (isSupabaseConfigured()) {
+        await storage.syncData();
+      }
+      await loadCards();
+      console.log('Data refreshed successfully');
+    } catch (error) {
+      console.error('Error refreshing data:', error);
+    } finally {
+      setIsRefreshing(false);
     }
   };
 
@@ -93,6 +147,34 @@ export const AdminDashboard: React.FC = () => {
   const handleLogout = () => {
     auth.logout();
     window.location.href = '/login';
+  };
+
+  const getConnectionStatusDisplay = () => {
+    switch (connectionStatus) {
+      case 'connected':
+        return (
+          <div className="flex items-center text-green-400 text-sm">
+            <Database className="w-4 h-4 mr-2" />
+            <Wifi className="w-3 h-3 mr-1" />
+            <span>Cloud Storage Active</span>
+          </div>
+        );
+      case 'local':
+        return (
+          <div className="flex items-center text-yellow-400 text-sm">
+            <Building2 className="w-4 h-4 mr-2" />
+            <WifiOff className="w-3 h-3 mr-1" />
+            <span>Local Storage Only</span>
+          </div>
+        );
+      default:
+        return (
+          <div className="flex items-center text-blue-400 text-sm">
+            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            <span>Checking Connection...</span>
+          </div>
+        );
+    }
   };
 
   if (isMigrating) {
@@ -128,23 +210,34 @@ export const AdminDashboard: React.FC = () => {
         {/* Header */}
         <div className="text-center mb-12">
           <div className="flex justify-between items-center mb-4">
-            <div className="flex items-center text-green-400 text-sm">
-              <Database className="w-4 h-4 mr-2" />
-              <span>Cloud Storage Active</span>
+            {getConnectionStatusDisplay()}
+            <div className="flex items-center gap-3">
+              <button
+                onClick={handleRefresh}
+                disabled={isRefreshing}
+                className="inline-flex items-center px-3 py-2 bg-blue-600/20 text-blue-400 rounded-lg hover:bg-blue-600/30 transition-colors duration-200 disabled:opacity-50"
+                title="Refresh Data"
+              >
+                <RefreshCw className={`w-4 h-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+                {isRefreshing ? 'Syncing...' : 'Refresh'}
+              </button>
+              <button
+                onClick={handleLogout}
+                className="inline-flex items-center px-4 py-2 bg-red-600/20 text-red-400 rounded-lg hover:bg-red-600/30 transition-colors duration-200"
+              >
+                <LogOut className="w-4 h-4 mr-2" />
+                Logout
+              </button>
             </div>
-            <button
-              onClick={handleLogout}
-              className="inline-flex items-center px-4 py-2 bg-red-600/20 text-red-400 rounded-lg hover:bg-red-600/30 transition-colors duration-200"
-            >
-              <LogOut className="w-4 h-4 mr-2" />
-              Logout
-            </button>
           </div>
           <h1 className="text-4xl lg:text-5xl font-bold text-white mb-4 bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
             Review Cards Dashboard
           </h1>
           <p className="text-slate-300">
-            Your review cards are now synced across all devices
+            {connectionStatus === 'connected' 
+              ? 'Your review cards are synced across all devices' 
+              : 'Managing review cards locally'
+            }
           </p>
         </div>
 
@@ -217,7 +310,12 @@ export const AdminDashboard: React.FC = () => {
               <Loader2 className="w-8 h-8 text-blue-400 animate-spin" />
             </div>
             <h3 className="text-2xl font-semibold text-white mb-2">Loading Cards</h3>
-            <p className="text-slate-400">Fetching your review cards from cloud storage...</p>
+            <p className="text-slate-400">
+              {connectionStatus === 'connected' 
+                ? 'Fetching your review cards from cloud storage...' 
+                : 'Loading your review cards from local storage...'
+              }
+            </p>
           </div>
         ) : filteredCards.length === 0 ? (
           <div className="text-center py-16">
@@ -249,7 +347,7 @@ export const AdminDashboard: React.FC = () => {
             <div>
               <h2 className="text-2xl font-bold text-white mb-6 flex items-center">
                 <Building2 className="w-6 h-6 mr-3" />
-                Review Cards
+                Review Cards ({filteredCards.length})
               </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {filteredCards.map((card) => (
@@ -279,7 +377,11 @@ export const AdminDashboard: React.FC = () => {
                       </div>
 
                       <div className="mb-4">
-                        <p className="text-xs text-slate-400 mb-1">Created</p>
+                        <p className="text-xs text-slate-400 mb-1">Category</p>
+                        <p className="text-sm text-slate-300">{card.category}</p>
+                        <p className="text-xs text-slate-400 mb-1 mt-2">Type</p>
+                        <p className="text-sm text-slate-300">{card.type}</p>
+                        <p className="text-xs text-slate-400 mb-1 mt-2">Created</p>
                         <p className="text-sm text-slate-300">{formatDate(card.createdAt)}</p>
                       </div>
 
@@ -317,7 +419,7 @@ export const AdminDashboard: React.FC = () => {
                 <div className="w-6 h-6 mr-3 bg-gradient-to-r from-blue-400 to-purple-400 rounded flex items-center justify-center">
                   <span className="text-xs font-bold text-white">QR</span>
                 </div>
-                QR Codes
+                QR Codes ({filteredCards.length})
               </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                 {filteredCards.map((card) => (
