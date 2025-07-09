@@ -1,5 +1,7 @@
 import { ReviewCard } from '../types';
-import { supabase } from './supabase';
+import { supabase, isSupabaseConfigured } from './supabase';
+
+const STORAGE_KEY = 'scc_review_cards';
 
 // Transform database row to ReviewCard type
 const transformDbRowToCard = (row: any): ReviewCard => ({
@@ -45,110 +47,126 @@ const transformCardToDbUpdate = (card: ReviewCard) => ({
 export const storage = {
   async getCards(): Promise<ReviewCard[]> {
     try {
-      const { data, error } = await supabase
-        .from('review_cards')
-        .select('*')
-        .order('created_at', { ascending: false });
+      // Use Supabase if configured, otherwise fall back to localStorage
+      if (isSupabaseConfigured() && supabase) {
+        const { data, error } = await supabase
+          .from('review_cards')
+          .select('*')
+          .order('created_at', { ascending: false });
 
-      if (error) {
-        console.error('Error fetching cards:', error);
-        return [];
+        if (error) {
+          console.error('Error fetching cards from Supabase:', error);
+          return this.getLocalCards();
+        }
+
+        return data || [];
+      } else {
+        return this.getLocalCards();
       }
-
-      return data?.map(transformDbRowToCard) || [];
     } catch (error) {
-      console.error('Error loading cards from database:', error);
-      return [];
+      console.error('Error loading cards:', error);
+      return this.getLocalCards();
     }
   },
 
-  async addCard(card: ReviewCard): Promise<boolean> {
+  async addCard(card: ReviewCard): Promise<void> {
     try {
-      const { error } = await supabase
-        .from('review_cards')
-        .insert(transformCardToDbInsert(card));
+      if (isSupabaseConfigured() && supabase) {
+        const { error } = await supabase
+          .from('review_cards')
+          .insert([card]);
 
-      if (error) {
-        console.error('Error adding card:', error);
-        return false;
+        if (error) {
+          console.error('Error adding card to Supabase:', error);
+          this.addLocalCard(card);
+          return;
+        }
+      } else {
+        this.addLocalCard(card);
       }
-
-      return true;
     } catch (error) {
-      console.error('Error saving card to database:', error);
-      return false;
+      console.error('Error adding card:', error);
+      this.addLocalCard(card);
     }
   },
 
-  async updateCard(updatedCard: ReviewCard): Promise<boolean> {
+  async updateCard(updatedCard: ReviewCard): Promise<void> {
     try {
-      const { error } = await supabase
-        .from('review_cards')
-        .update(transformCardToDbUpdate(updatedCard))
-        .eq('id', updatedCard.id);
+      if (isSupabaseConfigured() && supabase) {
+        const { error } = await supabase
+          .from('review_cards')
+          .update(updatedCard)
+          .eq('id', updatedCard.id);
 
-      if (error) {
-        console.error('Error updating card:', error);
-        return false;
+        if (error) {
+          console.error('Error updating card in Supabase:', error);
+          this.updateLocalCard(updatedCard);
+          return;
+        }
+      } else {
+        this.updateLocalCard(updatedCard);
       }
-
-      return true;
     } catch (error) {
-      console.error('Error updating card in database:', error);
-      return false;
+      console.error('Error updating card:', error);
+      this.updateLocalCard(updatedCard);
     }
   },
 
-  async deleteCard(cardId: string): Promise<boolean> {
+  async deleteCard(cardId: string): Promise<void> {
     try {
-      const { error } = await supabase
-        .from('review_cards')
-        .delete()
-        .eq('id', cardId);
+      if (isSupabaseConfigured() && supabase) {
+        const { error } = await supabase
+          .from('review_cards')
+          .delete()
+          .eq('id', cardId);
 
-      if (error) {
-        console.error('Error deleting card:', error);
-        return false;
+        if (error) {
+          console.error('Error deleting card from Supabase:', error);
+          this.deleteLocalCard(cardId);
+          return;
+        }
+      } else {
+        this.deleteLocalCard(cardId);
       }
-
-      return true;
     } catch (error) {
-      console.error('Error deleting card from database:', error);
-      return false;
+      console.error('Error deleting card:', error);
+      this.deleteLocalCard(cardId);
     }
   },
 
   async getCardBySlug(slug: string): Promise<ReviewCard | null> {
     try {
-      const { data, error } = await supabase
-        .from('review_cards')
-        .select('*')
-        .eq('slug', slug)
-        .single();
+      if (isSupabaseConfigured() && supabase) {
+        const { data, error } = await supabase
+          .from('review_cards')
+          .select('*')
+          .eq('slug', slug)
+          .single();
 
-      if (error) {
-        if (error.code === 'PGRST116') {
-          // No rows returned
-          return null;
+        if (error) {
+          console.error('Error fetching card by slug from Supabase:', error);
+          return this.getLocalCardBySlug(slug);
         }
-        console.error('Error fetching card by slug:', error);
-        return null;
-      }
 
-      return data ? transformDbRowToCard(data) : null;
+        return data;
+      } else {
+        return this.getLocalCardBySlug(slug);
+      }
     } catch (error) {
-      console.error('Error loading card by slug from database:', error);
-      return null;
+      console.error('Error loading card by slug:', error);
+      return this.getLocalCardBySlug(slug);
     }
   },
 
   // Migration helper: Move data from localStorage to Supabase
   async migrateFromLocalStorage(): Promise<void> {
-    try {
-      const localData = localStorage.getItem('scc_review_cards');
-      if (!localData) return;
+    if (!isSupabaseConfigured() || !supabase) {
+      console.log('Supabase not configured, skipping migration');
+      return;
+    }
 
-      const localCards: ReviewCard[] = JSON.parse(localData);
+    try {
+      const localCards = this.getLocalCards();
       if (localCards.length === 0) return;
 
       console.log(`Migrating ${localCards.length} cards from localStorage to Supabase...`);
