@@ -45,6 +45,51 @@ const transformCardToDbUpdate = (card: ReviewCard) => ({
 });
 
 export const storage = {
+  // Local storage helper methods
+  _getLocalCards(): ReviewCard[] {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      return stored ? JSON.parse(stored) : [];
+    } catch (error) {
+      console.error('Error reading from localStorage:', error);
+      return [];
+    }
+  },
+
+  _saveLocalCards(cards: ReviewCard[]): void {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(cards));
+    } catch (error) {
+      console.error('Error saving to localStorage:', error);
+    }
+  },
+
+  _addLocalCard(card: ReviewCard): void {
+    const cards = this._getLocalCards();
+    cards.unshift(card);
+    this._saveLocalCards(cards);
+  },
+
+  _updateLocalCard(updatedCard: ReviewCard): void {
+    const cards = this._getLocalCards();
+    const index = cards.findIndex(card => card.id === updatedCard.id);
+    if (index !== -1) {
+      cards[index] = updatedCard;
+      this._saveLocalCards(cards);
+    }
+  },
+
+  _deleteLocalCard(cardId: string): void {
+    const cards = this._getLocalCards();
+    const filteredCards = cards.filter(card => card.id !== cardId);
+    this._saveLocalCards(filteredCards);
+  },
+
+  _getLocalCardBySlug(slug: string): ReviewCard | null {
+    const cards = this._getLocalCards();
+    return cards.find(card => card.slug === slug) || null;
+  },
+
   async getCards(): Promise<ReviewCard[]> {
     try {
       // Use Supabase if configured, otherwise fall back to localStorage
@@ -56,63 +101,69 @@ export const storage = {
 
         if (error) {
           console.error('Error fetching cards from Supabase:', error);
-          return this.getLocalCards();
+          return this._getLocalCards();
         }
 
-        return data || [];
+        return (data || []).map(transformDbRowToCard);
       } else {
-        return this.getLocalCards();
+        return this._getLocalCards();
       }
     } catch (error) {
       console.error('Error loading cards:', error);
-      return this.getLocalCards();
+      return this._getLocalCards();
     }
   },
 
-  async addCard(card: ReviewCard): Promise<void> {
+  async addCard(card: ReviewCard): Promise<boolean> {
     try {
       if (isSupabaseConfigured() && supabase) {
         const { error } = await supabase
           .from('review_cards')
-          .insert([card]);
+          .insert([transformCardToDbInsert(card)]);
 
         if (error) {
           console.error('Error adding card to Supabase:', error);
-          this.addLocalCard(card);
-          return;
+          this._addLocalCard(card);
+          return false;
         }
+        return true;
       } else {
-        this.addLocalCard(card);
+        this._addLocalCard(card);
+        return true;
       }
     } catch (error) {
       console.error('Error adding card:', error);
-      this.addLocalCard(card);
+      this._addLocalCard(card);
+      return false;
     }
   },
 
-  async updateCard(updatedCard: ReviewCard): Promise<void> {
+  async updateCard(updatedCard: ReviewCard): Promise<boolean> {
     try {
       if (isSupabaseConfigured() && supabase) {
         const { error } = await supabase
           .from('review_cards')
-          .update(updatedCard)
+          .update(transformCardToDbUpdate(updatedCard))
           .eq('id', updatedCard.id);
 
         if (error) {
           console.error('Error updating card in Supabase:', error);
-          this.updateLocalCard(updatedCard);
-          return;
+          this._updateLocalCard(updatedCard);
+          return false;
         }
+        return true;
       } else {
-        this.updateLocalCard(updatedCard);
+        this._updateLocalCard(updatedCard);
+        return true;
       }
     } catch (error) {
       console.error('Error updating card:', error);
-      this.updateLocalCard(updatedCard);
+      this._updateLocalCard(updatedCard);
+      return false;
     }
   },
 
-  async deleteCard(cardId: string): Promise<void> {
+  async deleteCard(cardId: string): Promise<boolean> {
     try {
       if (isSupabaseConfigured() && supabase) {
         const { error } = await supabase
@@ -122,15 +173,18 @@ export const storage = {
 
         if (error) {
           console.error('Error deleting card from Supabase:', error);
-          this.deleteLocalCard(cardId);
-          return;
+          this._deleteLocalCard(cardId);
+          return false;
         }
+        return true;
       } else {
-        this.deleteLocalCard(cardId);
+        this._deleteLocalCard(cardId);
+        return true;
       }
     } catch (error) {
       console.error('Error deleting card:', error);
-      this.deleteLocalCard(cardId);
+      this._deleteLocalCard(cardId);
+      return false;
     }
   },
 
@@ -144,17 +198,21 @@ export const storage = {
           .single();
 
         if (error) {
+          // Handle the specific case where no rows are found
+          if (error.code === 'PGRST116') {
+            return null;
+          }
           console.error('Error fetching card by slug from Supabase:', error);
-          return this.getLocalCardBySlug(slug);
+          return this._getLocalCardBySlug(slug);
         }
 
-        return data;
+        return data ? transformDbRowToCard(data) : null;
       } else {
-        return this.getLocalCardBySlug(slug);
+        return this._getLocalCardBySlug(slug);
       }
     } catch (error) {
       console.error('Error loading card by slug:', error);
-      return this.getLocalCardBySlug(slug);
+      return this._getLocalCardBySlug(slug);
     }
   },
 
@@ -166,7 +224,7 @@ export const storage = {
     }
 
     try {
-      const localCards = this.getLocalCards();
+      const localCards = this._getLocalCards();
       if (localCards.length === 0) return;
 
       console.log(`Migrating ${localCards.length} cards from localStorage to Supabase...`);
@@ -181,7 +239,7 @@ export const storage = {
       }
 
       // Clear localStorage after successful migration
-      localStorage.removeItem('scc_review_cards');
+      localStorage.removeItem(STORAGE_KEY);
       console.log('Migration completed and localStorage cleared.');
     } catch (error) {
       console.error('Error during migration:', error);
