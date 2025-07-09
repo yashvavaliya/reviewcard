@@ -69,13 +69,6 @@ export const EditCardModal: React.FC<EditCardModalProps> = ({ card, onClose, onS
     }
 
     // Check for duplicate slug only if business name changed
-    if (formData.businessName !== card.businessName) {
-      const slug = generateSlug(formData.businessName);
-      const existingCard = storage.getCardBySlug(slug);
-      if (existingCard && existingCard.id !== card.id) {
-        newErrors.businessName = 'A card with this business name already exists';
-      }
-    }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;

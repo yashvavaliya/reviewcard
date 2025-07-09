@@ -56,10 +56,6 @@ export const AddCardModal: React.FC<AddCardModalProps> = ({ onClose, onSave }) =
     }
 
     const slug = generateSlug(formData.businessName);
-    const existingCard = storage.getCardBySlug(slug);
-    if (existingCard) {
-      newErrors.businessName = 'A card with this business name already exists';
-    }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
