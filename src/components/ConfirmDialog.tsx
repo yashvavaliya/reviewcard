@@ -7,7 +7,6 @@ interface ConfirmDialogProps {
   onConfirm: () => void;
   onCancel: () => void;
 }
-
 export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   title,
   message,
