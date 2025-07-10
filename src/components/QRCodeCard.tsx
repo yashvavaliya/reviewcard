@@ -403,6 +403,7 @@ export const QRCodeCard: React.FC<QRCodeCardProps> = ({ card }) => {
             <p className={`text-lg ${theme.cardText} opacity-80 mb-8`}>
               Help others discover our quality service
             </p>
+          </div>
 
           {/* Enhanced QR Code Section */}
           <div className="relative z-10 flex justify-center mb-10">
