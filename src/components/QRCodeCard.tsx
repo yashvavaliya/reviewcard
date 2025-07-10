@@ -377,7 +377,7 @@ export const QRCodeCard: React.FC<QRCodeCardProps> = ({ card }) => {
               </div>
             )}
             
-            <h1 className={`text-3xl font-bold ${theme.cardText} mb-3 leading-tight`}>
+            <h1 className={`text-2xl font-bold ${theme.cardText} mb-3 leading-tight`}>
               {card.businessName}
             </h1>
             <p className={`text-xl ${theme.cardText} opacity-80 mb-2`}>
