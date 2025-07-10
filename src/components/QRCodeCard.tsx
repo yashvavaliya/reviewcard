@@ -360,9 +360,7 @@ export const QRCodeCard: React.FC<QRCodeCardProps> = ({ card }) => {
           
           {/* Header Section */}
           <div className="relative z-10 text-center mb-8">
-            {/* <div className={`inline-flex items-center justify-center w-20 h-20 bg-gradient-to-r ${theme.gradient} rounded-3xl mb-6 shadow-2xl border-4 border-white/30`}>
-              <span className="text-4xl filter drop-shadow-lg">{theme.emoji}</span>
-            </div> */}
+            
             {/* Business Logo */}
             {card.logoUrl && (
               <div className="mb-6">
