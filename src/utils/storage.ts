@@ -292,6 +292,17 @@ export const storage = {
     }
 
     try {
+      // Test connection first before attempting migration
+      const { data: testData, error: testError } = await supabase
+        .from('review_cards')
+        .select('count')
+        .limit(1);
+      
+      if (testError) {
+        console.error('Supabase connection test failed, skipping migration:', testError);
+        return;
+      }
+
       const localCards = this._getLocalCards();
       if (localCards.length === 0) {
         console.log('No local cards to migrate');
@@ -306,11 +317,17 @@ export const storage = {
       for (const card of localCards) {
         try {
           // Check if card already exists in Supabase
-          const { data: existingCard } = await supabase
+          const { data: existingCard, error: checkError } = await supabase
             .from('review_cards')
             .select('id')
             .eq('slug', card.slug)
             .maybeSingle();
+
+          if (checkError) {
+            console.error(`Failed to check existing card: ${card.businessName}`, checkError);
+            failCount++;
+            continue;
+          }
 
           if (existingCard) {
             console.log(`Card already exists in Supabase: ${card.businessName}`);
@@ -347,6 +364,7 @@ export const storage = {
       }
     } catch (error) {
       console.error('Error during migration:', error);
+      console.log('Migration failed - keeping data in localStorage');
     }
   },
 

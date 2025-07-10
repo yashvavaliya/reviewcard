@@ -36,10 +36,17 @@ export const testSupabaseConnection = async (): Promise<boolean> => {
   }
 
   try {
-    const { data, error } = await supabase
+    // Add a timeout to prevent hanging
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('Connection timeout')), 5000)
+    );
+    
+    const connectionPromise = supabase
       .from('review_cards')
       .select('count')
       .limit(1);
+    
+    const { data, error } = await Promise.race([connectionPromise, timeoutPromise]) as any;
     
     if (error) {
       console.error('Supabase connection test failed:', error);

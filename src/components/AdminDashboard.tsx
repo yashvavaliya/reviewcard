@@ -59,7 +59,11 @@ export const AdminDashboard: React.FC = () => {
         if (localCards.length > 0) {
           console.log(`Found ${localCards.length} local cards to migrate`);
           setIsMigrating(true);
-          await storage.migrateFromLocalStorage();
+          try {
+            await storage.migrateFromLocalStorage();
+          } catch (migrationError) {
+            console.error('Migration failed, continuing with local storage:', migrationError);
+          }
           setIsMigrating(false);
           console.log('Migration completed');
         }
