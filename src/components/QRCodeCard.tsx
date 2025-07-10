@@ -360,35 +360,41 @@ export const QRCodeCard: React.FC<QRCodeCardProps> = ({ card }) => {
           
           {/* Header Section */}
           <div className="relative z-10 text-center mb-8">
-            {/* Business Logo */}
-            {card.logoUrl && (
-              <div className="mb-6">
-                <div className="w-24 h-24 bg-white rounded-2xl p-4 shadow-xl mx-auto border-4 border-gray-100">
-                  <img
-                    src={card.logoUrl}
-                    alt={`${card.businessName} Logo`}
-                    className="w-full h-full object-contain"
-                    onError={(e) => {
-                      const target = e.target as HTMLImageElement;
-                      target.style.display = 'none';
-                    }}
-                  />
+            {/* Business Logo and Info Side by Side */}
+            <div className="flex items-center justify-between mb-6">
+              {/* Business Logo - Left Side */}
+              {card.logoUrl && (
+                <div className="flex-shrink-0">
+                  <div className="w-24 h-24 bg-white rounded-2xl p-4 shadow-xl border-4 border-gray-100">
+                    <img
+                      src={card.logoUrl}
+                      alt={`${card.businessName} Logo`}
+                      className="w-full h-full object-contain"
+                      onError={(e) => {
+                        const target = e.target as HTMLImageElement;
+                        target.style.display = 'none';
+                      }}
+                    />
+                  </div>
                 </div>
+              )}
+              
+              {/* Business Info - Right Side */}
+              <div className={`flex-1 ${card.logoUrl ? 'ml-6' : ''} text-left`}>
+                <h1 className={`text-2xl font-bold ${theme.cardText} mb-2 leading-tight`}>
+                  {card.businessName}
+                </h1>
+                <p className={`text-xl ${theme.cardText} opacity-80 mb-2`}>
+                  {card.type}
+                </p>
+                {card.location && (
+                  <p className={`text-lg ${theme.cardText} opacity-70 flex items-center`}>
+                    <MapPin className="w-5 h-5 mr-2" />
+                    {card.location}
+                  </p>
+                )}
               </div>
-            )}
-            
-            <h1 className={`text-2xl font-bold ${theme.cardText} mb-3 leading-tight`}>
-              {card.businessName}
-            </h1>
-            <p className={`text-xl ${theme.cardText} opacity-80 mb-2`}>
-              {card.type}
-            </p>
-            {card.location && (
-              <p className={`text-lg ${theme.cardText} opacity-70 mb-6 flex items-center justify-center`}>
-                <MapPin className="w-5 h-5 mr-2" />
-                {card.location}
-              </p>
-            )}
+            </div>
             
             {/* Enhanced Star Rating */}
             <div className="flex justify-center mb-6">
