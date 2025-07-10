@@ -476,13 +476,6 @@ export const QRCodeCard: React.FC<QRCodeCardProps> = ({ card }) => {
               </span>
             </div>
           </div>
-
-          {/* Enhanced Footer */}
-          <div className="absolute bottom-8 left-10 right-10 text-center">
-            <p className={`text-sm ${theme.cardText} opacity-60`}>
-              Powered by Review Automation System
-            </p>
-          </div>
         </div>
       </div>
 
