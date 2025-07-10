@@ -377,7 +377,7 @@ export const QRCodeCard: React.FC<QRCodeCardProps> = ({ card }) => {
               </div>
             )}
             
-            <h1 className={`text-2xl font-bold ${theme.cardText} mb-3 leading-tight`}>
+            <h1 className={`text-3xl font-bold ${theme.cardText} mb-3 leading-tight`}>
               {card.businessName}
             </h1>
             <p className={`text-xl ${theme.cardText} opacity-80 mb-2`}>
@@ -400,6 +400,9 @@ export const QRCodeCard: React.FC<QRCodeCardProps> = ({ card }) => {
             <h2 className={`text-2xl font-bold ${theme.cardText} mb-4`}>
               Share Your Experience
             </h2>
+            <p className={`text-lg ${theme.cardText} opacity-80 mb-8`}>
+              Help others discover our quality service
+            </p>
           </div>
 
           {/* Enhanced QR Code Section */}
@@ -438,10 +441,7 @@ export const QRCodeCard: React.FC<QRCodeCardProps> = ({ card }) => {
 
           {/* Enhanced Instructions */}
           <div className="relative z-10 text-center">
-            <div className={`inline-flex items-center px-8 py-4 bg-gradient-to-r ${theme.gradient} rounded-full text-white font-bold text-xl mb-6 shadow-2xl`}>
-              <Smartphone className="w-6 h-6 mr-3" />
-              SCAN WITH CAMERA
-            </div>
+            
             
             <div className="grid grid-cols-3 gap-4 mb-6">
               <div className="text-center">
@@ -476,6 +476,7 @@ export const QRCodeCard: React.FC<QRCodeCardProps> = ({ card }) => {
               </span>
             </div>
           </div>
+
         </div>
       </div>
 
