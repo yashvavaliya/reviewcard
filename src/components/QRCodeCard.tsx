@@ -357,6 +357,9 @@ export const QRCodeCard: React.FC<QRCodeCardProps> = ({ card }) => {
           <div className="absolute inset-0 opacity-5">
             <PatternBackground />
           </div>
+          
+          {/* Header Section */}
+          <div className="relative z-10 text-center mb-8">
             {/* Business Logo */}
             {card.logoUrl && (
               <div className="mb-6">
@@ -400,7 +403,6 @@ export const QRCodeCard: React.FC<QRCodeCardProps> = ({ card }) => {
             <p className={`text-lg ${theme.cardText} opacity-80 mb-8`}>
               Help others discover our quality service
             </p>
-          </div>
 
           {/* Enhanced QR Code Section */}
           <div className="relative z-10 flex justify-center mb-10">
