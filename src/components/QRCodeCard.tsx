@@ -400,9 +400,6 @@ export const QRCodeCard: React.FC<QRCodeCardProps> = ({ card }) => {
             <h2 className={`text-2xl font-bold ${theme.cardText} mb-4`}>
               Share Your Experience
             </h2>
-            <p className={`text-lg ${theme.cardText} opacity-80 mb-8`}>
-              Help others discover our quality service
-            </p>
           </div>
 
           {/* Enhanced QR Code Section */}
