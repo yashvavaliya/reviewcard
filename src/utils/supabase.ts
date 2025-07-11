@@ -1,12 +1,9 @@
 import { createClient } from '@supabase/supabase-js';
 import { config } from './config';
 
-const supabaseUrl = config.supabase.url;
-const supabaseAnonKey = config.supabase.anonKey;
-
-// Only create client if environment variables are available
-export const supabase = supabaseUrl && supabaseAnonKey 
-  ? createClient(supabaseUrl, supabaseAnonKey, {
+// Only create client if environment variables are available and valid
+export const supabase = config.isSupabaseConfigured()
+  ? createClient(config.supabase.url, config.supabase.anonKey, {
       auth: {
         persistSession: false // Disable auth since we're using local auth
       }
