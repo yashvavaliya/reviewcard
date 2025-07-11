@@ -1,7 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
+import { config } from './config';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+const supabaseUrl = config.supabase.url;
+const supabaseAnonKey = config.supabase.anonKey;
 
 // Only create client if environment variables are available
 export const supabase = supabaseUrl && supabaseAnonKey 
@@ -13,12 +14,7 @@ export const supabase = supabaseUrl && supabaseAnonKey
   : null;
 
 export const isSupabaseConfigured = () => {
-  const isConfigured = !!(
-    supabaseUrl && 
-    supabaseAnonKey && 
-    supabaseUrl !== 'your_supabase_project_url_here' &&
-    supabaseUrl.includes('supabase.co')
-  );
+  const isConfigured = config.isSupabaseConfigured();
   
   if (isConfigured) {
     console.log('Supabase is properly configured');

@@ -1,7 +1,9 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { config } from './config';
 
-const GEMINI_API_KEY = 'AIzaSyCH-yvMejD3Ugv40gmM-DcVKyxVJ4xJBm0';
-const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+const genAI = config.isGeminiConfigured() 
+  ? new GoogleGenerativeAI(config.ai.geminiApiKey)
+  : null;
 
 export interface ReviewRequest {
   businessName: string;
@@ -12,9 +14,15 @@ export interface ReviewRequest {
 }
 
 export class AIReviewService {
-  private model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+  private model = genAI?.getGenerativeModel({ model: 'gemini-2.0-flash' }) || null;
 
   async generateReview(request: ReviewRequest): Promise<string> {
+    // Check if Gemini is configured
+    if (!config.isGeminiConfigured() || !this.model) {
+      console.warn('Gemini API not configured, using fallback review');
+      return this.getFallbackReview(request.businessName, request.starRating);
+    }
+
     const { businessName, category, type, highlights, starRating } = request;
     
     const sentimentGuide = {
