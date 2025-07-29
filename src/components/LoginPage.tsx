@@ -141,15 +141,7 @@ export const LoginPage: React.FC = () => {
               )}
             </button>
           </form>
-          
-          {/* Demo Credentials Info */}
-          {/* <div className="mt-6 p-4 bg-blue-500/20 border border-blue-500/30 rounded-lg">
-            <h3 className="text-sm font-semibold text-blue-300 mb-2">Demo Credentials:</h3>
-            <div className="space-y-1 text-xs text-blue-200">
-              <p><strong>Mobile:</strong> 9974361416</p>
-              <p><strong>Password:</strong> scc123</p>
-            </div>
-          </div> */}
+        
         </div>
 
         {/* Footer */}
